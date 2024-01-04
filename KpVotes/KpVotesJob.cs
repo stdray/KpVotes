@@ -103,17 +103,10 @@ public class KpVotesJob(ILogger<KpVotesJob> log, KpVotesJobOptions options, Twee
         return query.Reverse().ToList();
     }
 
-    async Task<IReadOnlyCollection<KpVote>> GetStoredVotes()
-    {
-        var text = await File.ReadAllTextAsync(options.VotesPath);
-        return File.Exists(options.VotesPath)
-            ? JsonSerializer.Deserialize<List<KpVote>>(text, _serializerOptions)
-            : [];
-    }
+    async Task<IReadOnlyCollection<KpVote>> GetStoredVotes() => File.Exists(options.VotesPath)
+        ? JsonSerializer.Deserialize<List<KpVote>>(await File.ReadAllTextAsync(options.VotesPath), _serializerOptions)
+        : [];
 
-    async Task UpdateStoredVotes(IEnumerable<KpVote> votes)
-    {
-        var text = JsonSerializer.Serialize(votes, _serializerOptions);
-        await File.WriteAllTextAsync(options.VotesPath, text);
-    }
+    async Task UpdateStoredVotes(IEnumerable<KpVote> votes) =>
+        await File.WriteAllTextAsync(options.VotesPath, JsonSerializer.Serialize(votes, _serializerOptions));
 }
