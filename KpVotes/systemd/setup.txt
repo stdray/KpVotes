@@ -1,0 +1,5 @@
+﻿sudo systemctl daemon-reload
+sudo systemctl start kp-votes.timer
+sudo systemctl enable kp-votes.timer
+sudo systemctl status kp-votes.timer
+sudo journalctl -u service-name -b

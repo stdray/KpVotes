@@ -1,0 +1,9 @@
+﻿[Unit]
+Description=KpVotes
+
+[Service]
+WorkingDirectory=/srv/kp-votes
+ExecStart=/srv/kp-votes/KpVotes
+
+[Install]
+WantedBy=default.target

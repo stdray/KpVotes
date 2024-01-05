@@ -1,0 +1,11 @@
+﻿[Unit]
+Description=Run KpVotes every hour
+After=network.target
+
+[Timer]
+OnBootSec=5m
+OnUnitActiveSec=1h
+Persistent=false
+
+[Install]
+WantedBy=timers.target

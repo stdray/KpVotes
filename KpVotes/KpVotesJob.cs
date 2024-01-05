@@ -1,112 +1,89 @@
-﻿using System.Text.Encodings.Web;
-using System.Text.Json;
-using System.Text.Unicode;
-using AngleSharp;
+﻿using AngleSharp.Html.Parser;
 using Microsoft.Extensions.Logging;
-using Quartz;
+using Newtonsoft.Json;
 using SocialOpinionAPI.Services.Tweet;
 
 namespace KpVotes;
 
-public class KpVotesJob(ILogger<KpVotesJob> log, KpVotesJobOptions options, TweetService twitter) : IJob
+public class KpVotesJob(
+    ILogger<KpVotesJob> logger,
+    KpVotesJobOptions options,
+    HttpClient http,
+    TweetService twitter,
+    IHtmlParser parser)
 {
-    readonly IEqualityComparer<KpVote> _comparer =
-        new KeyEqualityComparer<KpVote, Tuple<string, int>>(x => Tuple.Create(x.Uri, x.Vote));
-
-    readonly JsonSerializerOptions _serializerOptions = new()
-    {
-        Encoder = JavaScriptEncoder.Create(
-            UnicodeRanges.BasicLatin,
-            UnicodeRanges.Cyrillic,
-            UnicodeRanges.GeneralPunctuation),
-        WriteIndented = true
-    };
-
-    public async Task Execute(IJobExecutionContext context)
+    public async Task ExecuteAsync(CancellationToken cancel)
     {
         try
         {
-            log.LogInformation("Begin execute");
-            await ExecuteInternal(context);
-            log.LogInformation("Execute success");
+            logger.LogInformation("Begin GetAndPost");
+            await GetAndPost(cancel);
+            logger.LogInformation("End GetAndPost");
         }
         catch (Exception ex)
         {
-            log.LogInformation(ex, "Execute failed");
+            logger.LogError(ex, "End GetAndPost");
         }
     }
 
-    async Task ExecuteInternal(IJobExecutionContext context)
+    async Task GetAndPost(CancellationToken cancel)
     {
-        log.LogInformation("Read stored votes from {VotesPath}", options.VotesPath);
-        var storedVotes = await GetStoredVotes();
-        log.LogInformation("Stored votes count: {StoredVotesCount}", storedVotes.Count);
-
-        log.LogInformation("Get user votes from {UserVotesUri}", options.VotesUri);
-        var kpVotes = await ParseKpVotes(context.CancellationToken);
-        log.LogInformation("User votes count: {UserVotesCount}", kpVotes.Count);
-
-        log.LogInformation("Begin post votes");
-        var updatedVotes = PostVotes(storedVotes, kpVotes);
-        log.LogInformation("End post votes");
-
-        log.LogInformation("Begin update stored votes in {VotesPath}", options.VotesPath);
-        await UpdateStoredVotes(updatedVotes);
-        log.LogInformation("New stored votes count: {NewStoredVotesCount}", updatedVotes.Count - storedVotes.Count);
+        logger.LogInformation("Begin GetSiteVotes");
+        var siteVotes = await GetSiteVotes(cancel);
+        logger.LogInformation("End GetSiteVotes: {SiteVotesCount}", siteVotes.Length);
+        logger.LogInformation("Begin GetFileVotes");
+        var fileVotes = await GetFileVotes(cancel);
+        logger.LogInformation("End GetFileVotes: {FileVotesCount}", fileVotes?.Length);
+        var allVotes = (fileVotes ?? siteVotes).ToHashSet(x => new { x.Uri, x.Vote });
+        logger.LogInformation("Begin SendVoteToTwitter");
+        foreach (var vote in siteVotes)
+            if (allVotes.Add(vote))
+                SendVoteToTwitter(vote);
+        logger.LogInformation("End SendVoteToTwitter");
+        await SaveFileVotes(allVotes, cancel);
     }
 
-    ISet<KpVote> PostVotes(IEnumerable<KpVote> storedVotes, IEnumerable<KpVote> kpVotes)
+    void SendVoteToTwitter(KpVote vote)
     {
-        var votes = storedVotes.ToHashSet(_comparer);
-        if (votes.Any())
-        {
-            foreach (var vote in kpVotes)
-                if (votes.Add(vote))
-                    PostVote(vote);
-        }
-        else
-        {
-            log.LogInformation("Stored votes not found");
-            votes.UnionWith(kpVotes);
-        }
-        return votes;
-    }
-
-    void PostVote(KpVote vote)
-    {
-        log.LogInformation("Begin post vote: {VoteName}", vote.Name);
+        logger.LogInformation("Begin send {VoteName}", vote.Name);
+        var starts = "".PadLeft(vote.Vote, '\u2605') + "".PadRight(10 - vote.Vote, '\u2606');
         var uri = new Uri(options.KpUri, vote.Uri);
-        var text = $"Моя оценка «{vote.Name}» на Кинопоиске — {vote.Vote}\r\n{uri}";
+        var text = $"{vote.Name}.\r\nМоя оценка {vote.Vote} из 10 {starts} #kinopoisk\r\n{uri}";
         twitter.PostTextOnlyTweet(text);
-        log.LogInformation("End post vote: {VoteName}", vote.Name);
+        logger.LogInformation("End send {VoteName}", vote.Name);
     }
 
-
-    async Task<IReadOnlyCollection<KpVote>> ParseKpVotes(CancellationToken cancel)
+    async Task<KpVote[]> GetSiteVotes(CancellationToken cancel)
     {
-        if (options.SkipParse)
-            return Array.Empty<KpVote>();
-        var uri = new Uri(options.KpUri, options.VotesUri).ToString();
-        var config = Configuration.Default.WithDefaultLoader();
-        using var context = BrowsingContext.New(config);
-        using var document = await context.OpenAsync(uri, cancel);
+        if (options.SkipLoad)
+            return [];
+        var uri = new Uri(options.KpUri, options.VotesUri);
+        var html = await http.GetStringAsync(uri, cancel);
+        var doc = await parser.ParseDocumentAsync(html, cancel);
         var query =
-            from item in document.QuerySelectorAll(".historyVotes .item")
+            from item in doc.QuerySelectorAll(".historyVotes .item")
             let name = item.QuerySelector(".nameRus a")
             let vote = item.QuerySelector(".vote")
+            where name != null && vote != null
             select new KpVote
             (
-                name.GetAttribute("href"),
-                name.TextContent,
-                int.Parse(vote.TextContent)
+                Uri: name.GetAttribute("href"),
+                Name: name.TextContent,
+                Vote: int.Parse(vote.TextContent)
             );
-        return query.Reverse().ToList();
+        return query.Reverse().ToArray();
     }
 
-    async Task<IReadOnlyCollection<KpVote>> GetStoredVotes() => File.Exists(options.VotesPath)
-        ? JsonSerializer.Deserialize<List<KpVote>>(await File.ReadAllTextAsync(options.VotesPath), _serializerOptions)
-        : [];
+    async Task<KpVote[]> GetFileVotes(CancellationToken cancel)
+    {
+        if (!File.Exists(options.CachePath)) return null;
+        var text = await File.ReadAllTextAsync(options.CachePath, cancel);
+        return JsonConvert.DeserializeObject<KpVote[]>(text);
+    }
 
-    async Task UpdateStoredVotes(IEnumerable<KpVote> votes) =>
-        await File.WriteAllTextAsync(options.VotesPath, JsonSerializer.Serialize(votes, _serializerOptions));
+    async Task SaveFileVotes(HashSet<KpVote> allVotes, CancellationToken cancel)
+    {
+        var text = JsonConvert.SerializeObject(allVotes);
+        await File.WriteAllTextAsync(options.CachePath, text, cancel);
+    }
 }
