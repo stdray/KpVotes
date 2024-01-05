@@ -46,12 +46,12 @@ public class KpVotesJob(ILogger<KpVotesJob> logger, KpVotesJobOptions options,
 
     void SendVoteToTwitter(KpVote vote)
     {
-        logger.LogInformation("Begin send {VoteName}", vote.Name);
+        logger.LogInformation("Begin send {VoteUri}", vote.Uri);
         var starts = "".PadLeft(vote.Vote, '\u2605') + "".PadRight(10 - vote.Vote, '\u2606');
         var uri = new Uri(options.KpUri, vote.Uri);
         var text = $"{vote.Name}.\r\nМоя оценка {vote.Vote} из 10 {starts} #kinopoisk\r\n{uri}";
         twitter.PostTextOnlyTweet(text);
-        logger.LogInformation("End send {VoteName}", vote.Name);
+        logger.LogInformation("End send {VoteUri}", vote.Uri);
     }
 
     async Task<KpVote[]> GetSiteVotes(CancellationToken cancel)
