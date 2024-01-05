@@ -5,12 +5,8 @@ using SocialOpinionAPI.Services.Tweet;
 
 namespace KpVotes;
 
-public class KpVotesJob(
-    ILogger<KpVotesJob> logger,
-    KpVotesJobOptions options,
-    HttpClient http,
-    TweetService twitter,
-    IHtmlParser parser)
+public class KpVotesJob(ILogger<KpVotesJob> logger, KpVotesJobOptions options, 
+    HttpClient http, TweetService twitter, IHtmlParser parser) 
 {
     public async Task ExecuteAsync(CancellationToken cancel)
     {
@@ -31,16 +27,21 @@ public class KpVotesJob(
         logger.LogInformation("Begin GetSiteVotes");
         var siteVotes = await GetSiteVotes(cancel);
         logger.LogInformation("End GetSiteVotes: {SiteVotesCount}", siteVotes.Length);
+        
         logger.LogInformation("Begin GetFileVotes");
         var fileVotes = await GetFileVotes(cancel);
         logger.LogInformation("End GetFileVotes: {FileVotesCount}", fileVotes?.Length);
-        var allVotes = (fileVotes ?? siteVotes).ToHashSet(x => new { x.Uri, x.Vote });
+        
         logger.LogInformation("Begin SendVoteToTwitter");
+        var allVotes = (fileVotes ?? siteVotes).ToHashSet(x => new { x.Uri, x.Vote });
         foreach (var vote in siteVotes)
             if (allVotes.Add(vote))
                 SendVoteToTwitter(vote);
         logger.LogInformation("End SendVoteToTwitter");
+
+        logger.LogInformation("Begin SaveFileVotes: {FileVotesCount}:", allVotes.Count);
         await SaveFileVotes(allVotes, cancel);
+        logger.LogInformation("End SaveFileVotes");
     }
 
     void SendVoteToTwitter(KpVote vote)

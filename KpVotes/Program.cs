@@ -7,11 +7,11 @@ using SocialOpinionAPI.Core;
 using SocialOpinionAPI.Services.Tweet;
 
 
-var host = Host.CreateDefaultBuilder(args)
+await Host.CreateDefaultBuilder(args)
     .ConfigureAppConfiguration((_, config) => { config.AddEnvironmentVariables("KpVotes_"); })
     .ConfigureServices((context, services) =>
     {
-        Console.WriteLine("Begin ConfigureServices: {0}", context.HostingEnvironment.EnvironmentName);
+        Console.WriteLine("ConfigureServices: {0}", context.HostingEnvironment.EnvironmentName);
         services.AddHttpClient();
         services.AddSingleton(context.Configuration.GetSection("TwitterCredentials").Get<OAuthInfo>());
         services.AddSingleton(context.Configuration.GetSection(nameof(KpVotesJobOptions)).Get<KpVotesJobOptions>());
@@ -19,10 +19,8 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddSingleton<TweetService>();
         services.AddSingleton<KpVotesJob>();
     })
-    .Build();
-await host.Services
+    .Build()
+    .Services
     .GetRequiredService<KpVotesJob>()
     .ExecuteAsync(CancellationToken.None);
-return 0;
-
     
