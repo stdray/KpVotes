@@ -12,7 +12,7 @@ await Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
         Console.WriteLine("ConfigureServices: {0}", context.HostingEnvironment.EnvironmentName);
-        services.AddHttpClient();
+        services.AddHttpClient(string.Empty, http => http.Timeout = TimeSpan.FromMinutes(5));
         services.AddSingleton(context.Configuration.GetSection("TwitterCredentials").Get<OAuthInfo>());
         services.AddSingleton(context.Configuration.GetSection(nameof(KpVotesJobOptions)).Get<KpVotesJobOptions>());
         services.AddSingleton<IHtmlParser, HtmlParser>();
