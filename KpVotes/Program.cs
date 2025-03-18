@@ -11,11 +11,12 @@ await Host.CreateDefaultBuilder(args)
     .ConfigureAppConfiguration((_, config) => { config.AddEnvironmentVariables("KpVotes_"); })
     .ConfigureServices((context, services) =>
     {
+        var options = context.Configuration.GetSection(nameof(KpVotesJobOptions)).Get<KpVotesJobOptions>();
         Console.WriteLine("ConfigureServices: {0}", context.HostingEnvironment.EnvironmentName);
-        services.AddHttpClient(string.Empty, http => http.Timeout = TimeSpan.FromMinutes(5));
         services.AddSingleton(context.Configuration.GetSection("TwitterCredentials").Get<OAuthInfo>());
-        services.AddSingleton(context.Configuration.GetSection(nameof(KpVotesJobOptions)).Get<KpVotesJobOptions>());
+        services.AddSingleton(options);
         services.AddSingleton<IHtmlParser, HtmlParser>();
+        services.AddSingleton<IKpClient, SeleniumClient>();
         services.AddSingleton<TweetService>();
         services.AddSingleton<KpVotesJob>();
     })
@@ -23,4 +24,3 @@ await Host.CreateDefaultBuilder(args)
     .Services
     .GetRequiredService<KpVotesJob>()
     .ExecuteAsync(CancellationToken.None);
-    

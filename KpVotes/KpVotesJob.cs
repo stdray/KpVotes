@@ -6,7 +6,7 @@ using SocialOpinionAPI.Services.Tweet;
 namespace KpVotes;
 
 public class KpVotesJob(ILogger<KpVotesJob> logger, KpVotesJobOptions options, 
-    HttpClient http, TweetService twitter, IHtmlParser parser) 
+    IKpClient kp, TweetService twitter, IHtmlParser parser) 
 {
     public async Task ExecuteAsync(CancellationToken cancel)
     {
@@ -59,7 +59,7 @@ public class KpVotesJob(ILogger<KpVotesJob> logger, KpVotesJobOptions options,
         if (options.SkipLoad)
             return [];
         var uri = new Uri(options.KpUri, options.VotesUri);
-        var html = await http.GetStringAsync(uri, cancel);
+        var html = await kp.GetPage(uri);
         var doc = await parser.ParseDocumentAsync(html, cancel);
         var query =
             from item in doc.QuerySelectorAll(".historyVotes .item")
