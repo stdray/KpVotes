@@ -1,19 +1,24 @@
 ﻿using AngleSharp.Html.Parser;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Quartz;
 using SocialOpinionAPI.Services.Tweet;
 
 namespace KpVotes;
 
-public class KpVotesJob(ILogger<KpVotesJob> logger, KpVotesJobOptions options, 
-    HttpClient http, TweetService twitter, IHtmlParser parser) 
+public class KpVotesJob(
+    ILogger<KpVotesJob> logger,
+    KpVotesJobOptions options,
+    HttpClient http,
+    TweetService twitter,
+    IHtmlParser parser) : IJob
 {
-    public async Task ExecuteAsync(CancellationToken cancel)
+    public async Task Execute(IJobExecutionContext context)
     {
         try
         {
             logger.LogInformation("Begin GetAndPost");
-            await GetAndPost(cancel);
+            await GetAndPost(context.CancellationToken);
             logger.LogInformation("End GetAndPost");
         }
         catch (Exception ex)
@@ -27,11 +32,11 @@ public class KpVotesJob(ILogger<KpVotesJob> logger, KpVotesJobOptions options,
         logger.LogInformation("Begin GetSiteVotes");
         var siteVotes = await GetSiteVotes(cancel);
         logger.LogInformation("End GetSiteVotes: {SiteVotesCount}", siteVotes.Length);
-        
+
         logger.LogInformation("Begin GetFileVotes");
         var fileVotes = await GetFileVotes(cancel);
         logger.LogInformation("End GetFileVotes: {FileVotesCount}", fileVotes?.Length);
-        
+
         logger.LogInformation("Begin SendVoteToTwitter");
         var allVotes = (fileVotes ?? siteVotes).ToHashSet(x => new { x.Uri, x.Vote });
         foreach (var vote in siteVotes)
