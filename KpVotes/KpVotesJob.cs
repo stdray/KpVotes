@@ -1,4 +1,6 @@
-﻿using AngleSharp.Html.Parser;
+﻿using AngleSharp;
+using AngleSharp.Html.Parser;
+using AngleSharp.Io;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Quartz;
@@ -17,9 +19,9 @@ public class KpVotesJob(
     {
         try
         {
-            logger.LogInformation("Begin GetAndPost");
+            logger.LogInformation("Begin GetAndPost {Trigger}", context.Trigger.Key);
             await GetAndPost(context.CancellationToken);
-            logger.LogInformation("End GetAndPost");
+            logger.LogInformation("End GetAndPost {Trigger}", context.Trigger.Key);
         }
         catch (Exception ex)
         {
@@ -63,9 +65,18 @@ public class KpVotesJob(
     {
         if (options.SkipLoad)
             return [];
+        var requester = new DefaultHttpRequester
+        {
+            Headers =
+            {
+                ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:138.0) Gecko/20100101 Firefox/138.0"
+            }
+        };
+        var config = Configuration.Default.WithDefaultLoader().With(requester);
+        var context = BrowsingContext.New(config);
         var uri = new Uri(options.KpUri, options.VotesUri);
-        var html = await http.GetStringAsync(uri, cancel);
-        var doc = await parser.ParseDocumentAsync(html, cancel);
+        var doc = await context.OpenAsync(uri.ToString(), cancellation: cancel);
+        Console.WriteLine(doc.ToHtml());
         var query =
             from item in doc.QuerySelectorAll(".historyVotes .item")
             let name = item.QuerySelector(".nameRus a")

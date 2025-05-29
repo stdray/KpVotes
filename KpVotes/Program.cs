@@ -29,19 +29,7 @@ Host.CreateDefaultBuilder(args)
         services.AddSingleton<KpVotesJob>();
 
         // Quartz.NET
-        services.AddQuartz(q =>
-        {
-            var jobKey = new JobKey("KpVotesJob");
-            q.AddJob<KpVotesJob>(opts => opts.WithIdentity(jobKey));
-            q.AddTrigger(opts => opts
-                .ForJob(jobKey)
-                .WithIdentity("KpVotesJob-trigger")
-                .WithSimpleSchedule(x => x
-                    .WithInterval(TimeSpan.FromHours(1))
-                    .RepeatForever()
-                )
-            );
-        });
+        services.AddQuartz(q => q.ScheduleJob<KpVotesJob>(interval: TimeSpan.FromHours(1)));
         services.AddQuartzHostedService(q =>
         {
             q.WaitForJobsToComplete = true;
