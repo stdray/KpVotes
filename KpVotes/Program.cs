@@ -9,7 +9,6 @@ using Quartz;
 using SocialOpinionAPI.Core;
 using SocialOpinionAPI.Services.Tweet;
 
-
 Host.CreateDefaultBuilder(args)
     .UseWindowsService()
     .ConfigureAppConfiguration((_, config) => { config.AddEnvironmentVariables("KpVotes_"); })
@@ -29,7 +28,7 @@ Host.CreateDefaultBuilder(args)
         services.AddSingleton<KpVotesJob>();
 
         // Quartz.NET
-        services.AddQuartz(q => q.ScheduleJob<KpVotesJob>(interval: TimeSpan.FromHours(1)));
+        services.AddQuartz(q => q.ScheduleJob<KpVotesJob>(TimeSpan.FromHours(1)));
         services.AddQuartzHostedService(q =>
         {
             q.WaitForJobsToComplete = true;

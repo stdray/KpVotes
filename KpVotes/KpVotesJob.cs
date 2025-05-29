@@ -1,19 +1,15 @@
 ﻿using AngleSharp;
-using AngleSharp.Html.Parser;
-using AngleSharp.Io;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using OpenQA.Selenium;
+using OpenQA.Selenium.Firefox;
+using OpenQA.Selenium.Support.UI;
 using Quartz;
 using SocialOpinionAPI.Services.Tweet;
 
 namespace KpVotes;
 
-public class KpVotesJob(
-    ILogger<KpVotesJob> logger,
-    KpVotesJobOptions options,
-    HttpClient http,
-    TweetService twitter,
-    IHtmlParser parser) : IJob
+public class KpVotesJob(ILogger<KpVotesJob> logger, KpVotesJobOptions options, TweetService twitter) : IJob
 {
     public async Task Execute(IJobExecutionContext context)
     {
@@ -65,17 +61,21 @@ public class KpVotesJob(
     {
         if (options.SkipLoad)
             return [];
-        var requester = new DefaultHttpRequester
-        {
-            Headers =
-            {
-                ["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:138.0) Gecko/20100101 Firefox/138.0"
-            }
-        };
-        var config = Configuration.Default.WithDefaultLoader().With(requester);
-        var context = BrowsingContext.New(config);
         var uri = new Uri(options.KpUri, options.VotesUri);
-        var doc = await context.OpenAsync(uri.ToString(), cancellation: cancel);
+        var driverOptions = new FirefoxOptions();
+        driverOptions.AddArgument("--headless"); // Запуск без окна
+        using var driver = new FirefoxDriver(driverOptions);
+        driver.Navigate().GoToUrl(uri);
+        // Ждем полной загрузки страницы (можно добавить явное ожидание нужного элемента)
+        var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+        wait.Until(drv =>
+            drv.FindElements(By.CssSelector(".historyVotes .item")).Any()
+            || drv.FindElements(By.CssSelector(".CheckboxCaptcha-Button")).Any());
+        var pageSource = driver.PageSource;
+
+        // Парсим HTML с AngleSharp
+        var context = BrowsingContext.New(Configuration.Default);
+        var doc = await context.OpenAsync(req => req.Content(pageSource), cancel);
         Console.WriteLine(doc.ToHtml());
         var query =
             from item in doc.QuerySelectorAll(".historyVotes .item")
@@ -84,9 +84,9 @@ public class KpVotesJob(
             where name != null && vote != null
             select new KpVote
             (
-                Uri: name.GetAttribute("href"),
-                Name: name.TextContent,
-                Vote: int.Parse(vote.TextContent)
+                name.GetAttribute("href"),
+                name.TextContent,
+                int.Parse(vote.TextContent)
             );
         return query.Reverse().ToArray();
     }
