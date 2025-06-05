@@ -1,7 +1,7 @@
 #nullable enable
 using Quartz;
 
-namespace KpVotes;
+namespace KpVotes.Quartz;
 
 public static class QuartzExtensions
 {

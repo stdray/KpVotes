@@ -399,3 +399,4 @@ FodyWeavers.xsd
 .idea
 KpVotes/appsettings.Development.json
 KpVotes/appsettings.Production.json
+KpVotes/votes.json

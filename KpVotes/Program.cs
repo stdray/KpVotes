@@ -1,13 +1,13 @@
 ﻿using AngleSharp.Html.Parser;
-using KpVotes;
+using KpVotes.Kinopoisk;
+using KpVotes.Quartz;
+using KpVotes.Twitter;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NLog.Extensions.Logging;
 using Quartz;
-using SocialOpinionAPI.Core;
-using SocialOpinionAPI.Services.Tweet;
 
 Host.CreateDefaultBuilder(args)
     .UseWindowsService()
@@ -20,15 +20,22 @@ Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
         Console.WriteLine("ConfigureServices: {0}", context.HostingEnvironment.EnvironmentName);
-        services.AddHttpClient(string.Empty, http => http.Timeout = TimeSpan.FromMinutes(5));
-        services.AddSingleton(context.Configuration.GetSection("TwitterCredentials").Get<OAuthInfo>());
-        services.AddSingleton(context.Configuration.GetSection(nameof(KpVotesJobOptions)).Get<KpVotesJobOptions>());
-        services.AddSingleton<IHtmlParser, HtmlParser>();
-        services.AddSingleton<TweetService>();
-        services.AddSingleton<KpVotesJob>();
+        services.AddOptions<SeleniumLoaderOptions>().BindConfiguration(nameof(SeleniumLoaderOptions));
+        // services.AddOptions<AngleSharpLoaderOptions>().BindConfiguration(nameof(AngleSharpLoaderOptions));
+        services.AddOptions<ProxyOptions>().BindConfiguration(nameof(ProxyOptions));
+        services.AddOptions<TwitterCredentials>().BindConfiguration(nameof(TwitterCredentials));
+        services.AddOptions<KpVotesJobOptions>().BindConfiguration(nameof(KpVotesJobOptions));
+        services.AddSingleton<IKpParser, KpParser>();
+        // services.AddScoped<IKpLoader, AngleSharpLoader>();
+        services.AddScoped<IKpLoader, SeleniumLoader>();
+        services.AddScoped<ITwitterClient, TwitterClient>();
+        services.AddScoped<IHtmlParser, HtmlParser>();
+        services.AddScoped<KpVotesJob>();
 
-        // Quartz.NET
-        services.AddQuartz(q => q.ScheduleJob<KpVotesJob>(TimeSpan.FromHours(1)));
+        var jobOptions = context.Configuration
+            .GetSection(nameof(KpVotesJobOptions))
+            .Get<KpVotesJobOptions>();
+        services.AddQuartz(q => q.ScheduleJob<KpVotesJob>(jobOptions.Interval));
         services.AddQuartzHostedService(q =>
         {
             q.WaitForJobsToComplete = true;
