@@ -1,4 +1,4 @@
-﻿namespace KpVotes.Kinopoisk;
+﻿namespace KpVotes.Jobs;
 
 public class KpVotesJobOptions
 {

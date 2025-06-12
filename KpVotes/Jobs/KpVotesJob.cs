@@ -1,11 +1,12 @@
-﻿using KpVotes.System;
+﻿using KpVotes.Kinopoisk;
+using KpVotes.System;
 using KpVotes.Twitter;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Quartz;
 
-namespace KpVotes.Kinopoisk;
+namespace KpVotes.Jobs;
 
 public class KpVotesJob(
     ILogger<KpVotesJob> logger,
@@ -16,6 +17,11 @@ public class KpVotesJob(
     : IJob
 {
     KpVotesJobOptions Options => jobOptions.Value;
+
+    readonly JsonSerializerSettings _jsonSettings = new()
+    {
+        Formatting = Formatting.Indented,
+    };
 
     public async Task Execute(IJobExecutionContext context)
     {
@@ -56,7 +62,7 @@ public class KpVotesJob(
                 {
                     await SendVoteToTwitter(vote);
                     logger.LogInformation("Begin SaveFileVotes: {FileVotesCount}:", allVotes.Count);
-                    await SaveFileVotes(Options.CachePath, allVotes, cancel);      
+                    await SaveFileVotes(Options.CachePath, allVotes, cancel);
                     logger.LogInformation("End SaveFileVotes");
                     await Task.Delay(Options.TwitterDelay, cancel);
                 }
@@ -94,10 +100,17 @@ public class KpVotesJob(
         }
 
         var html = await GetSiteHtml(cancel);
-        var items = parser.Parse(html).ToHashSet();
-        if (items.Any())
-            await SaveFileVotes(Options.PageVotesPath, items, cancel);
-        return items;
+        var result = parser.Parse(html);
+
+        if (result is KpParserResult.UserVotes votes)
+        {
+            var items = votes.Votes.ToHashSet();
+            if (items.Any())
+                await SaveFileVotes(Options.PageVotesPath, items, cancel);
+            return items;
+        }
+
+        throw new InvalidOperationException("Captcha is not supported");
     }
 
     void Clean()
@@ -116,12 +129,12 @@ public class KpVotesJob(
     {
         if (!File.Exists(Options.CachePath)) return null;
         var text = await File.ReadAllTextAsync(path, cancel);
-        return JsonConvert.DeserializeObject<KpVote[]>(text);
+        return JsonConvert.DeserializeObject<KpVote[]>(text, _jsonSettings);
     }
 
     async Task SaveFileVotes(string path, HashSet<KpVote> allVotes, CancellationToken cancel)
     {
-        var text = JsonConvert.SerializeObject(allVotes);
+        var text = JsonConvert.SerializeObject(allVotes, _jsonSettings);
         await File.WriteAllTextAsync(path, text, cancel);
     }
 }

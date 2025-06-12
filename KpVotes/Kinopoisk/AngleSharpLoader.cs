@@ -8,7 +8,6 @@ public class AngleSharpLoader(IOptionsSnapshot<AngleSharpLoaderOptions> options)
 {
     public async Task<string> Load(Uri uri, CancellationToken cancellation)
     {
-        //
         var requester = new DefaultHttpRequester
         {
             Headers = { ["User-Agent"] = options.Value.UserAgent }

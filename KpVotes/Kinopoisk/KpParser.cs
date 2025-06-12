@@ -5,10 +5,12 @@ namespace KpVotes.Kinopoisk;
 
 public class KpParser : IKpParser
 {
-    public IReadOnlyCollection<KpVote> Parse(string html)
+    public KpParserResult Parse(string html)
     {
         var parser = new HtmlParser();
         var doc = parser.ParseDocument(html);
+        if (doc.QuerySelectorAll(Const.CaptchaSelector).Any())
+            return new KpParserResult.Captcha();
         var query =
             from item in doc.QuerySelectorAll(Const.VotesSelector)
             let name = item.QuerySelector(".nameRus a")
@@ -20,6 +22,6 @@ public class KpParser : IKpParser
                 name.TextContent,
                 int.Parse(vote.TextContent)
             );
-        return query.Reverse().ToArray();
+        return new KpParserResult.UserVotes(query.Reverse().ToArray());
     }
 }

@@ -1,4 +1,5 @@
 ﻿using AngleSharp.Html.Parser;
+using KpVotes.Jobs;
 using KpVotes.Kinopoisk;
 using KpVotes.Quartz;
 using KpVotes.Twitter;
@@ -20,16 +21,24 @@ Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
         Console.WriteLine("ConfigureServices: {0}", context.HostingEnvironment.EnvironmentName);
-        services.AddOptions<SeleniumLoaderOptions>().BindConfiguration(nameof(SeleniumLoaderOptions));
-        // services.AddOptions<AngleSharpLoaderOptions>().BindConfiguration(nameof(AngleSharpLoaderOptions));
+        
+        services.AddScoped<IHtmlParser, HtmlParser>();
+        services.AddSingleton<IKpParser, KpParser>();
+
         services.AddOptions<ProxyOptions>().BindConfiguration(nameof(ProxyOptions));
         services.AddOptions<TwitterCredentials>().BindConfiguration(nameof(TwitterCredentials));
-        services.AddOptions<KpVotesJobOptions>().BindConfiguration(nameof(KpVotesJobOptions));
-        services.AddSingleton<IKpParser, KpParser>();
-        // services.AddScoped<IKpLoader, AngleSharpLoader>();
-        services.AddScoped<IKpLoader, SeleniumLoader>();
+        
+        services.AddOptions<AngleSharpLoaderOptions>().BindConfiguration(nameof(AngleSharpLoaderOptions));
+        services.AddScoped<IKpLoader, AngleSharpLoader>();
+        
+        // services.AddOptions<SeleniumLoaderOptions>().BindConfiguration(nameof(SeleniumLoaderOptions));
+        // services.AddScoped<IKpLoader, SeleniumLoader>();
+        
+        services.AddOptions<ProxyOptions>().BindConfiguration(nameof(ProxyOptions));
+        services.AddOptions<TwitterCredentials>().BindConfiguration(nameof(TwitterCredentials));
         services.AddScoped<ITwitterClient, TwitterClient>();
-        services.AddScoped<IHtmlParser, HtmlParser>();
+        
+        services.AddOptions<KpVotesJobOptions>().BindConfiguration(nameof(KpVotesJobOptions));
         services.AddScoped<KpVotesJob>();
 
         var jobOptions = context.Configuration
