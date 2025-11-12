@@ -1,6 +1,6 @@
 ﻿// 1. Build the project (Release or Debug) to get the exe file, for example:
 //    dotnet publish -c Release -r win-x64 --self-contained true
-//    The path to the exe will be: KpVotes\bin\Release\netX\win-x64\publish\KpVotes.exe
+//    The path to the exe will be: KpVotes\bin\Release\net10.0\win-x64\publish\KpVotes.exe
 
 // 2. Install the service as NetworkService (replace path_to_your_exe_file with the actual path to KpVotes.exe):
 
